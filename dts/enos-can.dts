@@ -3,91 +3,94 @@
  *
  * Device Tree Overlay for ENOS Board — Raspberry Pi 5 (BCM2712 / RP1)
  *
- * FIXES APPLIED:
- * 1. Explicitly sets GPIO 8 (CS0) and GPIO 7 (CS1) to OUTPUT mode.
- * - This overrides the hardware default (ALT0) causing the 0xFF error.
- * 2. Adds Pull-Up resistors to all CS lines to prevent bus errors/floating.
- * 3. Binds the pin configurations to the SPI0 controller.
+ * STRATEGY: Self-Contained Bus Definition.
+ * We define the entire SPI0 bus here (Pins, Controller, and Devices).
+ * This forces the Chip Selects (CS0, CS1, CS2) into GPIO Output mode,
+ * preventing the "0xFF" error caused by hardware SPI conflicts.
  */
 
 /dts-v1/;
 /plugin/;
 
 / {
-	compatible = "brcm,bcm2712";
+    compatible = "brcm,bcm2712";
 
-	/* * Fragment 0: Pinmux Configuration 
-	 * Define the physical electrical properties of the pins.
-	 */
-	fragment@0 {
-		target = <&gpio>;
-		__overlay__ {
-			/* SPI0 Bus Pins: MOSI(10), MISO(9), SCLK(11) */
-			enos_spi0_pins: enos_spi0_pins {
-				brcm,pins = <9 10 11>;
-				brcm,function = <4>; /* ALT0 (SPI Function) */
-			};
+    /* Fragment 0: Define Pin Modes (Physical Layer) */
+    fragment@0 {
+        target = <&gpio>;
+        __overlay__ {
+            /* SPI0 Data/Clock: MISO(9), MOSI(10), SCLK(11) */
+            enos_spi0_pins: enos_spi0_pins {
+                brcm,pins = <9 10 11>;
+                brcm,function = <4>; /* ALT0 (SPI) */
+            };
 
-			/* * Chip Select Pins: CS0(8), CS1(7), CS2(21) 
-			 * STRICTLY OUTPUT MODE. 
-			 * If these are ALT0, the software driver cannot toggle them, causing 0xFF.
-			 */
-			enos_cs_pins: enos_cs_pins {
-				brcm,pins = <8 7 21>;
-				brcm,function = <1>; /* Output */
-				brcm,pull = <2>;     /* Pull-Up (High Idle) */
-			};
+            /* Chip Selects: CS0(8), CS1(7), CS2(21) -> FORCE OUTPUT */
+            enos_cs_pins: enos_cs_pins {
+                brcm,pins = <8 7 21>;
+                brcm,function = <1>; /* Output */
+                brcm,pull = <2>;     /* Pull-Up (High when idle) */
+            };
 
-			/* Interrupt Pin for MCP2518FD (GPIO 26) */
-			enos_can_int: enos_can_int {
-				brcm,pins = <26>;
-				brcm,function = <0>; /* Input */
-				brcm,pull = <2>;     /* Pull-Up */
-			};
-		};
-	};
+            /* CAN Interrupt: GPIO 26 -> Input */
+            enos_can_int: enos_can_int {
+                brcm,pins = <26>;
+                brcm,function = <0>; /* Input */
+                brcm,pull = <2>;     /* Pull-Up */
+            };
+        };
+    };
 
-	/* * Fragment 1: Oscillator 
-	 * 20 MHz Fixed Clock for MCP2518FD (Development)
-	 */
-	fragment@1 {
-		target-path = "/clocks";
-		__overlay__ {
-			enos_can_osc: enos_can_osc {
-				compatible = "fixed-clock";
-				#clock-cells = <0>;
-				clock-frequency = <20000000>;
-			};
-		};
-	};
+    /* Fragment 1: 20MHz Oscillator for CAN */
+    fragment@1 {
+        target-path = "/clocks";
+        __overlay__ {
+            enos_can_osc: enos_can_osc {
+                compatible = "fixed-clock";
+                #clock-cells = <0>;
+                clock-frequency = <20000000>;
+            };
+        };
+    };
 
-	/* * Fragment 2: SPI0 Controller Configuration 
-	 */
-	fragment@2 {
-		target = <&spi0>;
-		__overlay__ {
-			/* Define software control for all 3 chip selects */
-			cs-gpios = <&gpio 8 1>, <&gpio 7 1>, <&gpio 21 1>;
-			num-cs = <3>;
-			status = "okay";
+    /* Fragment 2: The SPI Controller & Devices */
+    fragment@2 {
+        target = <&spi0>;
+        __overlay__ {
+            status = "okay";
+            /* Use Software Chip Selects for ALL devices */
+            cs-gpios = <&gpio 8 1>, <&gpio 7 1>, <&gpio 21 1>;
+            num-cs = <3>;
+            
+            /* Apply Pin Settings to the Controller */
+            pinctrl-names = "default";
+            pinctrl-0 = <&enos_spi0_pins &enos_cs_pins>;
 
-			/* * APPLY PIN SETTINGS 
-			 * This binds the pin definitions from Fragment 0 to this driver.
-			 */
-			pinctrl-names = "default";
-			pinctrl-0 = <&enos_spi0_pins &enos_cs_pins>;
+            /* Device 0: LoRa #1 (CS0) */
+            spidev@0 {
+                compatible = "spidev";
+                reg = <0>;
+                spi-max-frequency = <1000000>; /* 1 MHz */
+            };
 
-			/* CS2 Device: MCP2518FD CAN Controller */
-			mcp2518fd: mcp2518fd@2 {
-				compatible = "microchip,mcp2518fd";
-				reg = <2>;
-				spi-max-frequency = <10000000>;
-				clocks = <&enos_can_osc>;
-				interrupt-parent = <&gpio>;
-				interrupts = <26 8>; /* IRQ_TYPE_LEVEL_LOW */
-				pinctrl-names = "default";
-				pinctrl-0 = <&enos_can_int>;
-			};
-		};
-	};
+            /* Device 1: LoRa #2 (CS1) */
+            spidev@1 {
+                compatible = "spidev";
+                reg = <1>;
+                spi-max-frequency = <1000000>; /* 1 MHz */
+            };
+
+            /* Device 2: CAN Controller (CS2) */
+            mcp2518fd: mcp2518fd@2 {
+                compatible = "microchip,mcp2518fd";
+                reg = <2>;
+                spi-max-frequency = <10000000>; /* 10 MHz */
+                clocks = <&enos_can_osc>;
+                interrupt-parent = <&gpio>;
+                interrupts = <26 8>; /* Level Low */
+                pinctrl-names = "default";
+                pinctrl-0 = <&enos_can_int>;
+            };
+        };
+    };
 };
