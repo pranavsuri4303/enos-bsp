@@ -1,0 +1,82 @@
+/*
+ * enos-can.dts
+ *
+ * Device Tree Overlay for ENOS Board — Raspberry Pi 5 (BCM2712 / RP1)
+ *
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2712";
+
+    /* * Fragment 0: Pinmux Configuration 
+     * We must explicitly define the mode for ALL pins to override 
+     * defaults set by dtparam=spi=on.
+     */
+    fragment@0 {
+        target = <&gpio>;
+        __overlay__ {
+            /* SPI Data/Clock pins (MISO, MOSI, SCLK) -> ALT0 (SPI Function) */
+            enos_spi0_pins: enos_spi0_pins {
+                brcm,pins = <9 10 11>;
+                brcm,function = <4>; /* ALT0 on BCM2712 */
+            };
+
+            /* Chip Selects (CS0, CS1, CS2) -> Output (Software CS) */
+            enos_cs_pins: enos_cs_pins {
+                brcm,pins = <8 7 21>;
+                brcm,function = <1>; /* Output */
+                brcm,pull = <2>;     /* Pull-up (High Idle) */
+            };
+
+            /* MCP2518FD Interrupt -> Input */
+            enos_can_int: enos_can_int {
+                brcm,pins = <26>;
+                brcm,function = <0>; /* Input */
+                brcm,pull = <2>;     /* Pull-up */
+            };
+        };
+    };
+
+    /* Fragment 1: Oscillator (20 MHz) */
+    fragment@1 {
+        target-path = "/clocks";
+        __overlay__ {
+            enos_can_osc: enos_can_osc {
+                compatible = "fixed-clock";
+                #clock-cells = <0>;
+                clock-frequency = <20000000>;
+            };
+        };
+    };
+
+    /* Fragment 2: SPI0 Controller Configuration */
+    fragment@2 {
+        target = <&spi0>;
+        __overlay__ {
+            cs-gpios = <&gpio 8 1>, <&gpio 7 1>, <&gpio 21 1>;
+            num-cs = <3>;
+            status = "okay";
+
+            /* * CRITICAL FIX: Assign pinmux to the controller 
+             * This forces GPIO 8 & 7 to become Outputs instead of Hardware CS
+             */
+            pinctrl-names = "default";
+            pinctrl-0 = <&enos_spi0_pins &enos_cs_pins>;
+
+            /* CS2: CAN Controller */
+            mcp2518fd: mcp2518fd@2 {
+                compatible = "microchip,mcp2518fd";
+                reg = <2>;
+                spi-max-frequency = <10000000>;
+                clocks = <&enos_can_osc>;
+                interrupt-parent = <&gpio>;
+                interrupts = <26 8>; /* Level Low */
+                pinctrl-names = "default";
+                pinctrl-0 = <&enos_can_int>;
+            };
+        };
+    };
+};
