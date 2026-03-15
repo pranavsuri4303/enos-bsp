@@ -1,0 +1,6 @@
+# Stable LoRa device aliases for ENOS board
+# RX module on CS0 -> /dev/spidev0.0
+# TX module on CS1 -> /dev/spidev0.1
+
+KERNEL=="spidev0.0", SYMLINK+="lora-rx"
+KERNEL=="spidev0.1", SYMLINK+="lora-tx"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build ENOS device tree overlay
+# Build ENOS overlays from dts/*.dts
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,18 +11,27 @@ mkdir -p "$BUILD_DIR"
 
 echo "=== ENOS BSP Build ==="
 
-# Check for device tree compiler
 if ! command -v dtc &>/dev/null; then
     echo "ERROR: dtc (device tree compiler) not found"
     echo "Install with: sudo apt install device-tree-compiler"
     exit 1
 fi
 
-# Compile overlay
-echo "Compiling enos-can.dts..."
-dtc -@ -I dts -O dtb -W no-unit_address_vs_reg \
-    -o "$BUILD_DIR/enos-can.dtbo" \
-    "$DTS_DIR/enos-can.dts"
+shopt -s nullglob
+dts_files=("$DTS_DIR"/*.dts)
+if [[ ${#dts_files[@]} -eq 0 ]]; then
+    echo "ERROR: No .dts files found in $DTS_DIR"
+    exit 1
+fi
 
-echo "Output: $BUILD_DIR/enos-can.dtbo"
+for dts_file in "${dts_files[@]}"; do
+    base_name="$(basename "$dts_file" .dts)"
+    out_file="$BUILD_DIR/$base_name.dtbo"
+    echo "Compiling $(basename "$dts_file")..."
+    dtc -@ -I dts -O dtb -W no-unit_address_vs_reg \
+        -o "$out_file" \
+        "$dts_file"
+    echo "  Output: $out_file"
+done
+
 echo "=== Build complete ==="

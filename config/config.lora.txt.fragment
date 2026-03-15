@@ -1,0 +1,6 @@
+# ENOS LoRa fragment
+# Explicitly maps SPI0 CS lines for LoRa modules:
+#   CS0 (GPIO8) -> /dev/spidev0.0 (RX module)
+#   CS1 (GPIO7) -> /dev/spidev0.1 (TX module)
+
+dtoverlay=enos-lora
