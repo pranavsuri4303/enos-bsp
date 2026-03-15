@@ -33,6 +33,8 @@
         target = <&spi0>;
         __overlay__ {
             status = "okay";
+            #address-cells = <1>;
+            #size-cells = <0>;
             num-cs = <2>;
             cs-gpios = <&gpio 8 1>, <&gpio 7 1>;
             pinctrl-names = "default";
