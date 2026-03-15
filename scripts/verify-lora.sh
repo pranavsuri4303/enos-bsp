@@ -24,7 +24,8 @@ if ! detect_boot_layout; then
 fi
 echo "  Target: $(print_model)"
 echo "  Config: $CONFIG_FILE"
-check "SPI core enabled (dtparam=spi=on)" "grep -q '^dtparam=spi=on' '$CONFIG_FILE'"
+check "enos-lora overlay configured" "grep -q '^dtoverlay=enos-lora' '$CONFIG_FILE'"
+check "enos-lora.dtbo installed" "test -e \"$OVERLAY_DIR/enos-lora.dtbo\""
 check "spidev0.0 exists" "test -e /dev/spidev0.0"
 check "spidev0.1 exists" "test -e /dev/spidev0.1"
 check "lora-rx alias exists" "test -e /dev/lora-rx"

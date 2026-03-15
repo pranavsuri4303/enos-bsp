@@ -20,10 +20,10 @@ help:
 build:
 	@bash scripts/build.sh
 
-install:
+install: build
 	@$(SUDO) bash scripts/install.sh
 
-install-lora:
+install-lora: build
 	@$(SUDO) bash scripts/install-lora.sh
 
 uninstall:

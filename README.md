@@ -34,7 +34,7 @@ make version-check
 
 | File/Setting | Destination | Purpose |
 |--------------|-------------|---------|
-| `dtparam=spi=on` | `config.txt` (auto-detected) | Uses known-working SPI enable path for `spidev0.0` + `spidev0.1` |
+| `dtoverlay=enos-lora` | `config.txt` (auto-detected) | Enables explicit SPI0 overlay for deterministic `spidev0.0` + `spidev0.1` mapping |
 | `99-enos-lora.rules` | `/etc/udev/rules.d/` | Creates stable aliases `/dev/lora-rx` and `/dev/lora-tx` |
 
 ## After Reboot
