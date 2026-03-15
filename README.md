@@ -1,11 +1,11 @@
 # enos-bsp
 
-Board Support Package for the ENOS board on Raspberry Pi 5.
+Board Support Package for the ENOS board on Raspberry Pi 5/4.
 
 ## Hardware
 
 - **2x LoRa** (EByte E28-2G4M27SX / SX1280) — explicit SPI0 overlay
-- CAN support is temporarily removed in this branch.
+- CAN support is temporarily removed until hardware fixed.
 
 ## Quick Start
 
@@ -77,28 +77,20 @@ enos-bsp/
 - Debian Trixie 13 (kernel 6.12+)
 - Device tree compiler (`sudo apt install device-tree-compiler`)
 
-## LoRa Reset Behavior
+## LoRa Reset & Bring-Up
 
-Practical guidance:
+What this BSP provides:
 
-- Reset once before radio initialization (boot-time or app-start) is usually enough.
-- Do **not** hardware-reset before every packet send; that can add latency and lose configured state.
-- If you see garbage after faults, recover by re-initializing radio state (or one reset + full init), not per-message resets.
+- Device tree overlay for SPI0 and stable aliases `/dev/lora-rx` and `/dev/lora-tx`.
+- A helper tool `lora_version_check.py` that, for **each** radio:
+	- Pulses reset (RX: GPIO22, TX: GPIO5).
+	- Waits for BUSY to go low.
+	- Reads register `0x0153` to confirm basic SPI communication.
 
-EN behavior for your wiring:
+How to use it:
 
-- RX_EN is hardware-tied high (always enabled).
-- TX_EN should be asserted only during transmit windows.
-- Keep TX_EN low during RX/idle to reduce self-interference.
+- After `make install` + `sudo reboot`, run:
+	- `make verify` to check nodes and aliases.
+	- `make version-check` (or `sudo python3 tools/lora_version_check.py`) to sanity-check wiring and reset/BUSY behavior.
 
-Reset lines from your shared pinout:
-
-- RX_RESET = GPIO22
-- TX_RESET = GPIO5
-
-Helper examples with your reset wiring:
-
-- Run both RX and TX checks: `make version-check`
-- Direct command: `sudo python3 tools/lora_version_check.py`
-
-If your wiring exposes `NRST`/`BUSY`, add explicit init sequencing in your TX/RX application. This repo currently only validates low-level SPI reachability.
+Production radio software should perform its own one-time reset + init on startup; this BSP focuses on wiring, overlay, and low-level SPI reachability rather than full SX128x configuration.

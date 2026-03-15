@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# OS/editor noise
+.DS_Store
+*.swp
