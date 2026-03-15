@@ -25,6 +25,9 @@ make verify
 
 # 5. Optional quick check (same as verify)
 make test
+
+# 6. Optional helper: reset RX/TX, wait BUSY, read version register
+make version-check
 ```
 
 ## What Gets Installed
@@ -63,6 +66,8 @@ enos-bsp/
 │   ├── config.txt.fragment    # LoRa config fragment
 │   ├── config.lora.txt.fragment
 │   └── 99-enos-lora.rules     # Stable device aliases
+├── tools/
+│   └── lora_version_check.py    # Reset + BUSY wait + version read helper
 ├── Makefile
 └── README.md
 ```
@@ -86,5 +91,15 @@ EN behavior for your wiring:
 - RX_EN is hardware-tied high (always enabled).
 - TX_EN should be asserted only during transmit windows.
 - Keep TX_EN low during RX/idle to reduce self-interference.
+
+Reset lines from your shared pinout:
+
+- RX_RESET = GPIO22
+- TX_RESET = GPIO5
+
+Helper examples with your reset wiring:
+
+- Run both RX and TX checks: `make version-check`
+- Direct command: `sudo python3 tools/lora_version_check.py`
 
 If your wiring exposes `NRST`/`BUSY`, add explicit init sequencing in your TX/RX application. This repo currently only validates low-level SPI reachability.

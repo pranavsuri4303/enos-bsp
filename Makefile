@@ -3,7 +3,7 @@
 
 SUDO := $(shell if [ "$$(id -u)" -eq 0 ]; then echo ""; else echo "sudo"; fi)
 
-.PHONY: build install install-lora uninstall uninstall-lora verify verify-lora test clean help
+.PHONY: build install install-lora uninstall uninstall-lora verify verify-lora test version-check clean help
 
 help:
 	@echo "ENOS BSP — Available targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make uninstall    Remove LoRa SPI config (requires sudo)"
 	@echo "  make verify       Verify LoRa SPI path"
 	@echo "  make test         Alias for verify"
+	@echo "  make version-check Reset RX/TX, wait BUSY, and read version registers"
 	@echo "  make clean      Remove build artifacts"
 	@echo ""
 
@@ -39,6 +40,9 @@ verify-lora:
 
 test:
 	@$(MAKE) verify
+
+version-check:
+	@$(SUDO) /usr/bin/python3 tools/lora_version_check.py
 
 clean:
 	rm -rf build/
