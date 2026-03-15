@@ -27,8 +27,7 @@ except ImportError:
 
 
 SX1280_REG_FIRMWARE_VERSION = 0x0153
-SX1280_CMD_READ_REGISTER = 0x1D
-SX1280_EXPECTED_VERSION = 0xA9
+SX1280_CMD_READ_REGISTER = 0x19
 
 GPIO_TOOL = ""
 
@@ -201,11 +200,13 @@ def check_module(name: str, device_path: str, reset_gpio: int, busy_gpio: int, s
         spi.close()
 
     print(f"  Version reg 0x0153: 0x{version:02X}")
-    if version == SX1280_EXPECTED_VERSION:
-        print("  PASS: version matches expected SX1280 value")
-        return True
+    # Align semantics with prior lora_test.py: treat 0x00/0xFF as failure
+    # (MISO stuck or chip not responding), anything else counts as a pass.
+    if version in (0x00, 0xFF):
+        print(f"  FAIL — register returned 0x{version:02X} (chip alive but version unreadable)")
+        return False
 
-    print("  WARN: version differs from expected 0xA9")
+    print("  PASS")
     return True
 
 
