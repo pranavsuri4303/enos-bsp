@@ -1,5 +1,5 @@
 #!/bin/bash
-# Uninstall only ENOS LoRa SPI overlay path
+# Uninstall only ENOS LoRa SPI path
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

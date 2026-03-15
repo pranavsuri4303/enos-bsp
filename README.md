@@ -34,8 +34,7 @@ make version-check
 
 | File/Setting | Destination | Purpose |
 |--------------|-------------|---------|
-| `enos-lora.dtbo` | `/boot/firmware/overlays/` or `/boot/overlays/` | Explicit SPI0 overlay with fixed CS mapping |
-| `dtoverlay=enos-lora` | `config.txt` (auto-detected) | Loads LoRa overlay and creates `spidev0.0` + `spidev0.1` |
+| `dtparam=spi=on` | `config.txt` (auto-detected) | Uses known-working SPI enable path for `spidev0.0` + `spidev0.1` |
 | `99-enos-lora.rules` | `/etc/udev/rules.d/` | Creates stable aliases `/dev/lora-rx` and `/dev/lora-tx` |
 
 ## After Reboot

@@ -20,7 +20,7 @@ help:
 build:
 	@bash scripts/build.sh
 
-install: build
+install:
 	@$(SUDO) bash scripts/install.sh
 
 install-lora:

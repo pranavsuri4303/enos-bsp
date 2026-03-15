@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install only ENOS LoRa SPI path using explicit overlay
+# Install only ENOS LoRa SPI path using the known-working dtparam flow
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,14 +21,6 @@ detect_boot_layout
 echo "  Target: $(print_model)"
 echo "  Config: $CONFIG_FILE"
 
-if [[ ! -f "$BUILD_DIR/enos-lora.dtbo" ]]; then
-    echo "ERROR: enos-lora.dtbo not found. Run build.sh first."
-    exit 1
-fi
-
-cp "$BUILD_DIR/enos-lora.dtbo" "$OVERLAY_DIR/enos-lora.dtbo"
-echo "  Installed overlay: $OVERLAY_DIR/enos-lora.dtbo"
-
 cp "$UDEV_RULES_SRC" "$UDEV_RULES_DST"
 if command -v udevadm &>/dev/null; then
     udevadm control --reload-rules
@@ -36,17 +28,8 @@ if command -v udevadm &>/dev/null; then
 fi
 echo "  Installed udev aliases: /dev/lora-rx and /dev/lora-tx"
 
-if ! grep -q "^dtoverlay=enos-lora" "$CONFIG_FILE"; then
-    echo "" >> "$CONFIG_FILE"
-    echo "# ENOS LORA — Explicit SPI0 mapping (CS0=GPIO8 RX, CS1=GPIO7 TX)" >> "$CONFIG_FILE"
-    echo "dtoverlay=enos-lora" >> "$CONFIG_FILE"
-    echo "  Added: dtoverlay=enos-lora"
-else
-    echo "  Already present: dtoverlay=enos-lora"
-fi
-
-# Keep SPI core enabled for compatibility on Pi4/Pi5 images where SPI node
-# is not active unless dtparam=spi=on is present.
+# Known-good baseline on Pi4/Pi5 for exposing /dev/spidev0.0 and /dev/spidev0.1
+# is stock SPI enable with dtparam=spi=on.
 if ! grep -q '^dtparam=spi=on$' "$CONFIG_FILE"; then
     echo "# ENOS LORA — Ensure SPI core enabled" >> "$CONFIG_FILE"
     echo "dtparam=spi=on" >> "$CONFIG_FILE"
@@ -54,5 +37,11 @@ if ! grep -q '^dtparam=spi=on$' "$CONFIG_FILE"; then
 else
     echo "  Already present: dtparam=spi=on"
 fi
+
+# Keep SPI core enabled for compatibility on Pi4/Pi5 images where SPI node
+# is not active unless dtparam=spi=on is present.
+# Disable the custom overlay line if present from newer experiments.
+sed -i '/# ENOS LORA — Explicit SPI0 mapping (CS0=GPIO8 RX, CS1=GPIO7 TX)/d' "$CONFIG_FILE"
+sed -i '/^dtoverlay=enos-lora$/d' "$CONFIG_FILE"
 
 echo "=== LoRa install complete ==="
