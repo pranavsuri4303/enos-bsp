@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -27,6 +29,24 @@ except ImportError:
 SX1280_REG_FIRMWARE_VERSION = 0x0153
 SX1280_CMD_READ_REGISTER = 0x1D
 SX1280_EXPECTED_VERSION = 0xA9
+
+GPIO_TOOL = ""
+
+
+def detect_gpio_tool() -> str:
+    if shutil.which("pinctrl"):
+        return "pinctrl"
+    if shutil.which("raspi-gpio"):
+        return "raspi-gpio"
+    return ""
+
+
+def resolve_device_path(device_path: str, fallback_path: str) -> str:
+    if os.path.exists(device_path):
+        return device_path
+    if os.path.exists(fallback_path):
+        return fallback_path
+    return device_path
 
 
 def parse_spidev_path(device_path: str) -> tuple[int, int]:
@@ -62,15 +82,54 @@ def export_gpio(gpio: int) -> Path:
 
 
 def set_gpio_output(gpio: int, level: int) -> None:
-    gpio_dir = export_gpio(gpio)
-    write_file(gpio_dir / "direction", "out")
-    write_file(gpio_dir / "value", "1" if level else "0")
+    try:
+        gpio_dir = export_gpio(gpio)
+        write_file(gpio_dir / "direction", "out")
+        write_file(gpio_dir / "value", "1" if level else "0")
+        return
+    except Exception:
+        pass
+
+    if GPIO_TOOL == "pinctrl":
+        state = "dh" if level else "dl"
+        subprocess.run(["pinctrl", "set", str(gpio), "op", state], check=True, capture_output=True, text=True)
+        return
+
+    if GPIO_TOOL == "raspi-gpio":
+        state = "dh" if level else "dl"
+        subprocess.run(["raspi-gpio", "set", str(gpio), "op", state], check=True, capture_output=True, text=True)
+        return
+
+    raise RuntimeError(
+        f"unable to drive GPIO{gpio}: sysfs GPIO failed and no pinctrl/raspi-gpio tool found"
+    )
 
 
 def read_gpio_input(gpio: int) -> int:
-    gpio_dir = export_gpio(gpio)
-    write_file(gpio_dir / "direction", "in")
-    return int((gpio_dir / "value").read_text().strip())
+    try:
+        gpio_dir = export_gpio(gpio)
+        write_file(gpio_dir / "direction", "in")
+        return int((gpio_dir / "value").read_text().strip())
+    except Exception:
+        pass
+
+    if GPIO_TOOL == "pinctrl":
+        out = subprocess.run(["pinctrl", "get", str(gpio)], check=True, capture_output=True, text=True).stdout.lower()
+        if " hi" in out or "=1" in out:
+            return 1
+        return 0
+
+    if GPIO_TOOL == "raspi-gpio":
+        out = subprocess.run(["raspi-gpio", "get", str(gpio)], check=True, capture_output=True, text=True).stdout.lower()
+        if "level=1" in out:
+            return 1
+        if "level=0" in out:
+            return 0
+        raise RuntimeError(f"could not parse GPIO level from raspi-gpio output: {out.strip()}")
+
+    raise RuntimeError(
+        f"unable to read GPIO{gpio}: sysfs GPIO failed and no pinctrl/raspi-gpio tool found"
+    )
 
 
 def pulse_reset(reset_gpio: int, reset_low_ms: int, settle_ms: int) -> None:
@@ -100,11 +159,16 @@ def read_register(spi: spidev.SpiDev, reg: int) -> int:
 
 
 def check_module(name: str, device_path: str, reset_gpio: int, busy_gpio: int, speed: int, reset_low_ms: int, settle_ms: int, busy_timeout_ms: int) -> bool:
-    print(f"\n[{name}] {device_path}")
+    resolved_device = resolve_device_path(
+        device_path=device_path,
+        fallback_path="/dev/spidev0.0" if name == "RX" else "/dev/spidev0.1",
+    )
+    print(f"\n[{name}] {device_path} (resolved: {resolved_device})")
     try:
-        bus, dev = parse_spidev_path(device_path)
+        bus, dev = parse_spidev_path(resolved_device)
     except Exception as exc:
         print(f"  FAIL: {exc}")
+        print("  Hint: run 'make verify' and check /dev/spidev0.0 and /dev/spidev0.1")
         return False
 
     try:
@@ -146,6 +210,8 @@ def check_module(name: str, device_path: str, reset_gpio: int, busy_gpio: int, s
 
 
 def main() -> int:
+    global GPIO_TOOL
+
     parser = argparse.ArgumentParser(description="Reset RX/TX LoRa modules and read version register")
     parser.add_argument("--rx-device", default="/dev/lora-rx", help="RX SPI device path")
     parser.add_argument("--tx-device", default="/dev/lora-tx", help="TX SPI device path")
@@ -159,8 +225,14 @@ def main() -> int:
     parser.add_argument("--busy-timeout-ms", type=int, default=500, help="BUSY wait timeout in ms")
     args = parser.parse_args()
 
+    GPIO_TOOL = detect_gpio_tool()
+
     print("=== ENOS LoRa Version Check ===")
     print("Flow: reset -> wait BUSY low -> read version register")
+    if GPIO_TOOL:
+        print(f"GPIO backend: sysfs + {GPIO_TOOL} fallback")
+    else:
+        print("GPIO backend: sysfs only")
 
     ok_rx = check_module(
         name="RX",
