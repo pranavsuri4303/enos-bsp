@@ -25,6 +25,7 @@ fi
 echo "  Target: $(print_model)"
 echo "  Config: $CONFIG_FILE"
 check "enos-lora overlay configured" "grep -q '^dtoverlay=enos-lora' '$CONFIG_FILE'"
+check "SPI core enabled (dtparam=spi=on)" "grep -q '^dtparam=spi=on' '$CONFIG_FILE'"
 check "enos-lora.dtbo installed" "test -e '$OVERLAY_DIR/enos-lora.dtbo'"
 check "spidev0.0 exists" "test -e /dev/spidev0.0"
 check "spidev0.1 exists" "test -e /dev/spidev0.1"
@@ -35,6 +36,10 @@ if [[ $FAIL -eq 0 ]]; then
     echo "  Result: PASS"
 else
     echo "  Result: FAIL"
+    if [[ ! -e /dev/spidev0.0 && -e /dev/spidev0.1 ]]; then
+        echo "  Hint: only CS1 is active. Check for conflicting SPI overlays in config.txt"
+        grep -nE '^dtoverlay=spi0|^dtoverlay=.*spi|^dtparam=spi' "$CONFIG_FILE" || true
+    fi
 fi
 
 exit $FAIL

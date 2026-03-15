@@ -35,6 +35,8 @@ fi
 if [[ -f "$CONFIG_FILE" ]]; then
     sed -i '/# ENOS LORA — Explicit SPI0 mapping (CS0=GPIO8 RX, CS1=GPIO7 TX)/d' "$CONFIG_FILE"
     sed -i '/^dtoverlay=enos-lora$/d' "$CONFIG_FILE"
+    sed -i '/# ENOS LORA — Ensure SPI core enabled/d' "$CONFIG_FILE"
+    sed -i '/^dtparam=spi=on$/d' "$CONFIG_FILE"
 
     # Legacy cleanup from earlier LoRa-only install style.
     sed -i '/# ENOS LORA — Enable SPI0 userspace nodes/d' "$CONFIG_FILE"

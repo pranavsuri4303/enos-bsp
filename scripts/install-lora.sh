@@ -45,10 +45,14 @@ else
     echo "  Already present: dtoverlay=enos-lora"
 fi
 
-# Cleanup old ENOS-managed dtparam setup if present.
-sed -i '/# ENOS LORA — Enable SPI0 userspace nodes/d' "$CONFIG_FILE"
-if grep -q '^dtparam=spi=on$' "$CONFIG_FILE"; then
-    echo "  NOTE: Existing dtparam=spi=on left as-is (harmless with explicit overlay)"
+# Keep SPI core enabled for compatibility on Pi4/Pi5 images where SPI node
+# is not active unless dtparam=spi=on is present.
+if ! grep -q '^dtparam=spi=on$' "$CONFIG_FILE"; then
+    echo "# ENOS LORA — Ensure SPI core enabled" >> "$CONFIG_FILE"
+    echo "dtparam=spi=on" >> "$CONFIG_FILE"
+    echo "  Added: dtparam=spi=on"
+else
+    echo "  Already present: dtparam=spi=on"
 fi
 
 echo "=== LoRa install complete ==="
